@@ -141,6 +141,9 @@ def search (start, end):
     own_queue = []
     own_queue.append(start)
     q.put(root_node)
+
+
+def worker
     while not q.empty():
 
         q.task_done()
@@ -168,7 +171,7 @@ def search (start, end):
 
 def Main2():
     st = time.time()
-    search("Mämmi", "Fox")
+    search("Apple", "Alligator")
     et = time.time()
     took = et-st
     print(took)
