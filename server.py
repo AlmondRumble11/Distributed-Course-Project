@@ -1,6 +1,8 @@
 
 
 from collections import defaultdict
+from concurrent.futures import thread
+import json
 import time
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 from xmlrpc.server import SimpleXMLRPCServer
@@ -20,10 +22,11 @@ class RequestHandler(SimpleXMLRPCRequestHandler):
 #creating server
 server = SimpleXMLRPCServer((host,port), requestHandler=RequestHandler,logRequests=True ,allow_none=True,encoding='utf-8')
 q = queue.Queue()
+END = False
+Client_list =  []
 
 
-
-
+#https://stackoverflow.com/questions/2358045/how-can-i-implement-a-tree-in-python 
 class TreeNode:
 
     def __init__(self, node):
@@ -40,6 +43,8 @@ class TreeNode:
         parent.links.append(new_child)
       
         q.put(new_child)
+        
+
     
 
 def wikipediaSearch(start_topic):
@@ -92,6 +97,8 @@ def wikipediaSearch(start_topic):
                         link_list.append(link["title"])
         except KeyError:
             break
+        except json.decoder.JSONDecodeError:
+            break
         
     #print(len(link_list))
     return link_list
@@ -106,7 +113,7 @@ def seach_tree(start_node, end_value):
 
         if (link.node_value == end_value):
             print('Found the end value')
-            print(link.node_value, end_value)
+            
             return link
 
     return start_node
@@ -115,7 +122,7 @@ def print_path(head):
     path =  []
     temp = head
     while temp is not None:
-        print(temp.node_value)
+       # print(temp.node_value)
         path.append(temp.node_value)
         temp = temp.parent
     
@@ -127,55 +134,69 @@ def print_path(head):
             print(path[index], end=' --> ')
         else:
             print(path[index])
-    return 
+    return path
 
-def search (start, end):
+
+
+
+def worker (root_node, end):
+    global END
+    global Client_list
+    found = False
+    while not END:
+        
+        if (not q.empty()):
+            root_node = q.get()
+            search_term = root_node.node_value
+            links = wikipediaSearch(search_term)
+            for link in links:
+                root_node.add_link(link, root_node)
+            value_found = seach_tree(root_node, end)
+            if(value_found != root_node):
+                found = True
+            if(found):
+                path = print_path(value_found)
+
+                q.task_done()
+                Client_list.append(path)
+                END = True
+                
+                
+            
+
+def search2 (start, end):
 
     #links = proxy.wikipediaSearch(start)
     #print(links)
-
+    print('new connection')
+    print(start)
     root_node = TreeNode(start)
-    value_found = False
-    search_term = start
-    success = False
-    own_queue = []
-    own_queue.append(start)
+  
     q.put(root_node)
-
-
-def worker
-    while not q.empty():
-
-        q.task_done()
-        #t1 = time.time()
-        links = wikipediaSearch(search_term)
-       # t2 = time.time()
-        #full = t2-t1
-        #print(full)
-        for link in links:
-            root_node.add_link(link, root_node)
-        
-        value_found = seach_tree(root_node, end)
-        
-        if(value_found != root_node):
-            print_path(value_found)
-            success = True
+    thread_list = []
+   
+    for i in range(10):
+        work =  threading.Thread(target=worker, args=(root_node, end ), daemon=True)
+        work.start()
+        thread_list.append(work)
+    for thread in thread_list:
+        thread.join()
+    while True:
+        if(END):
+            return Client_list
             break
-        else:
-           root_node = q.get()
-           search_term = root_node.node_value
-           #print(q.qsize())
-          # print(search_term)
-           success = False
+
 
 
 def Main2():
     st = time.time()
-    search("Apple", "Alligator")
+    search2("Halo 3", "London")
     et = time.time()
     took = et-st
     print(took)
-Main2()
+    print(Client_list)
+    return Client_list
+#Main2()
 
 
 
@@ -317,14 +338,14 @@ def search(start, end):
 
     return ["Halo 3","7-Eleven","London"]
 server.register_function(checkCorrectParameters)
-server.register_function(search)
+server.register_function(search2)
 server.register_function(wikipediaSearch)
 #Main()
 
-#def main():
-#    try:
-#        print('Starting server')
-#        server.serve_forever() #runnin the server
-#    except KeyboardInterrupt:
-#        print('Shutting down the server')
-#main()
+def main():
+    try:
+        print('Starting server')
+        server.serve_forever() #runnin the server
+    except KeyboardInterrupt:
+        print('Shutting down the server')
+main()

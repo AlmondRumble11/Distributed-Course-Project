@@ -152,6 +152,10 @@ def main():
                 print("Closing the program")
                 sys.exit(0)
 
+            if (start == end):
+                print("Start and End are the same page --> shortest path is 0")
+                continue
+
             print('Checking if both pages can be found. Please wait a moment.')
 
             try:
@@ -204,7 +208,10 @@ def main():
 
 def Main():
     st = time.time()
-    search("Halo 3", "New York Police Department")
+    i = input("")
+    x = input()
+    res = proxy.search2(i, x)
+    print(res)
     et = time.time()
     took = et-st
     print(took)
