@@ -188,7 +188,7 @@ def main():
                 end_time = time.time()
 
                 #print out the results
-                print("Shortest path from '{}' to '{}'is lenght of {}:".format(start,end,len(result)))
+                print("Shortest path from '{}' to '{}' is lenght of {}:".format(start,end,len(result)))
                 for index in range(len(result)):
                     
                     if(index +1 < len(result)):
@@ -204,16 +204,17 @@ def main():
        
         else:
             print("No functions for that number\n") 
-#main()
+main()
 
 def Main():
-    st = time.time()
+    
     i = input("")
     x = input()
-    res = proxy.search2(i, x)
+    st = time.time()
+    res = proxy.search(i, x)
     print(res)
     et = time.time()
     took = et-st
     print(took)
-Main()
+#Main()
 
