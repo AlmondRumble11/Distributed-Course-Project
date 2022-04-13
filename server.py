@@ -6,7 +6,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 import requests
 import threading, queue
 from socketserver import ThreadingMixIn
-
+import sys
 
 #https://www.youtube.com/watch?v=_8xXrFWcWao
 #https://docs.python.org/3/library/xmlrpc.server.html 
@@ -293,13 +293,21 @@ def checkCorrectParameters(parameter):
     response = session.get(url=url, params=params)
     data = response.json()
 
-    #check that parameter is real page
-    if data['query']['search'][0]['title'] == parameter:
-        return True
-    else:
+    try:
+        #check that parameter is real page
+        if data['query']['search'][0]['title'] == parameter:
+            return True
+        else:
+            return False
+    except KeyError:
+        return False
+    except json.decoder.JSONDecodeError:
         return False
 
 
 
-
-run_server()
+try:
+    run_server()
+except KeyboardInterrupt:
+    print('Closing the server')
+    sys.exit(0)

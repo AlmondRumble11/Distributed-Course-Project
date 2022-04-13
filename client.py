@@ -1,7 +1,7 @@
 from operator import index
 from os import link
 import queue
-from xmlrpc.client import ServerProxy
+from xmlrpc.client import ServerProxy, Fault
 import sys
 import time
 
@@ -14,7 +14,7 @@ def Menu():
     
     #menu
     print("**********************MENU****************************")
-    print("1) Find the shortest path between 2 topic on Wikipedia")
+    print("1) Find the shortest path between 2 pages on Wikipedia")
     print("0) Close the program")
 
     #as long as user gives correct input
@@ -54,10 +54,10 @@ def main():
                 start = input("\nGive wikipedia page where to start the search: ")
                 end = input("Give wikipedia page where to end the search: ")
             except KeyboardInterrupt:
-                print("Closing the program")
+                print("\nClosing the program")
                 sys.exit(0)
             except ValueError:
-                print("Closing the program")
+                print("\nClosing the program")
                 sys.exit(0)
             
             #check that end and start page are correct search terms
@@ -65,9 +65,12 @@ def main():
             try:
                 start_found = proxy.checkCorrectParameters(start)
                 end_found = proxy.checkCorrectParameters(end)
-            except ConnectionRefusedError:
+            except (ConnectionRefusedError, Fault):
                 print('Could not connect to wikipedia. Please try again\n')
                 continue
+            except KeyboardInterrupt:
+                print("\nClosing the program")
+                sys.exit(0)
 
             #if both are the same-->
             if (start == end):
@@ -90,9 +93,13 @@ def main():
                 try:
                     #call the seach function from the server
                     result = proxy.search(start, end)
-                except ConnectionRefusedError:
+                except KeyboardInterrupt:
+                    print("\nClosing the program")
+                    sys.exit(0)
+                except (ConnectionRefusedError, Fault):
                     print('Could not connect to wikipedia. Please try again\n')
                     continue
+                    
                 #end timer
                 end_time = time.time()
 
@@ -110,16 +117,3 @@ def main():
         else:
             print("No functions for that number\n") 
 main()
-
-#def Main():
-#    
-#    i = input("")
-#    x = input()
-#    st = time.time()
-#    res = proxy.search(i, x)
-#    print(res)
-#   et = time.time()
-#    took = et-st
-#    print(took)
-#Main()
-
