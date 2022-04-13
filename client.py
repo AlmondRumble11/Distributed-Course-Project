@@ -11,6 +11,8 @@ proxy = ServerProxy('http://localhost:1234')
 q = queue.Queue()
 
 
+
+
 class TreeNode:
 
     def __init__(self, node):
@@ -207,13 +209,17 @@ def main():
 #main()
 
 def Main():
-    st = time.time()
+   
     i = input("")
-    x = input()
-    res = proxy.search2(i, x)
+    x = input("")
+    
+    st = time.time()
+    res = proxy.Main2(i, x)
+    #res = proxy.search2(i, x)
     print(res)
     et = time.time()
     took = et-st
     print(took)
+   
 Main()
 

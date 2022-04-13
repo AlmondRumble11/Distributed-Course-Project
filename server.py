@@ -1,15 +1,12 @@
 
 
-from collections import defaultdict
-from concurrent.futures import thread
+from http import client
 import json
 import time
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 from xmlrpc.server import SimpleXMLRPCServer
-from matplotlib.pyplot import title
 import requests
 import threading, queue
-from multiprocessing.pool import ThreadPool
 #https://www.youtube.com/watch?v=_8xXrFWcWao
 #https://docs.python.org/3/library/xmlrpc.server.html 
 #host and port
@@ -21,9 +18,11 @@ class RequestHandler(SimpleXMLRPCRequestHandler):
     rpc_paths = ('/RPC2',)
 #creating server
 server = SimpleXMLRPCServer((host,port), requestHandler=RequestHandler,logRequests=True ,allow_none=True,encoding='utf-8')
-q = queue.Queue()
+
 END = False
-Client_list =  []
+Client_list =  {}
+clients = {}
+client_done = {}
 
 
 #https://stackoverflow.com/questions/2358045/how-can-i-implement-a-tree-in-python 
@@ -42,7 +41,7 @@ class TreeNode:
         new_child.parent = parent
         parent.links.append(new_child)
       
-        q.put(new_child)
+        #q.put(new_child)
         
 
     
@@ -136,171 +135,101 @@ def print_path(head):
             print(path[index])
     return path
 
-
-
-
-def worker (root_node, end):
+def worker (root_node, end,q,id):
     global END
     global Client_list
+    global clients
+    global client_done
     found = False
-    while not END:
+
+    
+    while not  client_done[id]:
         
         if (not q.empty()):
             root_node = q.get()
             search_term = root_node.node_value
+            
             links = wikipediaSearch(search_term)
             for link in links:
                 root_node.add_link(link, root_node)
+                q.put(root_node.links[-1])
             value_found = seach_tree(root_node, end)
+           # print(found)
             if(value_found != root_node):
-                found = True
-            if(found):
+            #    found = True
+           # if(found):
                 path = print_path(value_found)
 
                 q.task_done()
-                Client_list.append(path)
-                END = True
+                Client_list[id] = path
+                client_done[id] = True
                 
-                
-            
-
-def search2 (start, end):
-
+def search2 (start, end, clientID,q):
+    global client_done
+    global clients
     #links = proxy.wikipediaSearch(start)
     #print(links)
     print('new connection')
-    print(start)
+   
+
     root_node = TreeNode(start)
-  
+    clients[clientID] = root_node
+    
     q.put(root_node)
     thread_list = []
    
     for i in range(10):
-        work =  threading.Thread(target=worker, args=(root_node, end ), daemon=True)
+        work =  threading.Thread(target=worker, args=(clients[clientID], end,q, clientID ), daemon=True)
         work.start()
         thread_list.append(work)
     for thread in thread_list:
         thread.join()
     while True:
-        if(END):
-            return Client_list
-            break
+        if(client_done[clientID]):
+            #print(Client_list)
+            #print(clients[clientID].node_value)
+            return Client_list[clientID]
+            
 
 
 
-def Main2():
+def Main2(start, end):
+    global clients
+    global client_done
     st = time.time()
-    search2("Halo 3", "London")
-    et = time.time()
-    took = et-st
-    print(took)
-    print(Client_list)
-    return Client_list
+    print(start, end)
+    q = queue.Queue()
+    
+
+
+    new_client_identifier = len(clients) + 1
+    clients[new_client_identifier] = [start]
+    client_done[new_client_identifier] = False
+
+
+
+    #start a new thread for the client that handles client messages
+    client_thread = threading.Thread(target=search2, args=(start,end, new_client_identifier,q), daemon=True)
+    client_thread.start()
+    
+    while True:
+       if(client_done[new_client_identifier]):
+            print(Client_list)
+            return Client_list[new_client_identifier]
+    #search2("Halo 3", "London")
+    #et = time.time()
+    #took = et-st
+    #print(took)
+    #print(Client_list)
+    #return Client_list
 #Main2()
 
 
 
+def print_line():
+    return "hello"
 
 
-
-def iterateList(graph,end_topic,visited,topic,link):
-
-    #while True:
-        
-       # graph = item[0]
-       # end_topic = item[1]
-       #visited = item[2]
-       # topic = item[3]
-       # link = item[4]
-        #found = item[5]
-        #print(link)
-        value = []
-        if (link == end_topic):
-            print('Topic found')
-            
-            #print("It took",taken_time,"seconds")
-            graph[link] = graph[topic] + [link]
-            print(graph[link])
-            
-            #q.task_done() 
-            value = []
-            value.append(graph[link])
-            value.append(True)
-            
-            return   [graph[link], True]
-            
-        #if not
-        else:
-            #add new link to graph only if it is not there yet (could lead to interesting results otherwise)
-            if(link not in graph):
-
-                #add new link to graph. Idea {linkname: previous levels, linkname}
-                graph[link] = graph[topic] + [link]
-                #visited.append(link)
-                value.append(graph[link])
-                #value.append(visited)
-                value.append(False)
-                visited.append(link)
-                return  [link, False]
-            #return q.task_done() 
-        return [link, False]
-        
-
-       
-                
-      
-
-
-      
-
-def Main():
-    begin_time = time.time()
-    #start_topic = "Halo 3"
-    start_topic = "United States"
-    #start_topic = "Elizabeth II"
-    #end_topic = "Alligator"
-    #end_topic = "Bread"
-    #end_topic = "New York City Police Department"
-    #end_topic = "New York City"
-    end_topic = "London"
-    #end_topic = 'Elon Musk'
-    #https://www.geeksforgeeks.org/shortest-path-unweighted-graph/
-    graph = {}
-
- 
-    graph[start_topic] = [start_topic]
-    visited = []
-   
-    visited.append(start_topic)
-    index = 0
-    topic_list = wikipediaSearch(start_topic) #0...280
-    
-    while True:
-
-        #get links for the topic name
-        topic = visited[index]
-        topic_list = wikipediaSearch(topic)
-        results = []
-      
-        
-        #send_list = []
-        #https://stackoverflow.com/questions/26104512/how-to-obtain-the-results-from-a-pool-of-threads-in-python/26104609#26104609
-        pool = ThreadPool(30)
-        results = []
-        for link in topic_list:
-            results.append(pool.apply(iterateList, args=(graph,end_topic,visited,topic,link)))
-        pool.close()
-        pool.join()
-        
-        for r in results:
-            
-
-            if(r[1] == True):
-        #        print(r[0])
-                end_time = time.time()
-                taken_time = end_time - begin_time
-                print("It took",taken_time,"seconds")
-                return 0
 
 
 #checking the correct seachterm
@@ -331,21 +260,21 @@ def checkCorrectParameters(parameter):
     else:
         return False
 
-#the algorithm function
-def search(start, end):
 
-
-
-    return ["Halo 3","7-Eleven","London"]
 server.register_function(checkCorrectParameters)
 server.register_function(search2)
 server.register_function(wikipediaSearch)
-#Main()
+server.register_function(Main2)
+server.register_function(print_line)
+print('Starting server')
+server.serve_forever()
 
-def main():
-    try:
-        print('Starting server')
-        server.serve_forever() #runnin the server
-    except KeyboardInterrupt:
-        print('Shutting down the server')
-main()
+
+#def main():
+#    try:
+#        print('Starting server')
+#        server.serve_forever() #runnin the server
+#    except KeyboardInterrupt:
+#        print('Shutting down the server')
+
+#ain()
