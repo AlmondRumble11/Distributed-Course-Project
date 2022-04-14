@@ -7,7 +7,8 @@ import requests
 import threading, queue
 from socketserver import ThreadingMixIn
 import sys
-
+import os
+import signal
 #https://www.youtube.com/watch?v=_8xXrFWcWao
 #https://docs.python.org/3/library/xmlrpc.server.html 
 #https://stackoverflow.com/questions/53621682/multi-threaded-xml-rpc-python3-7-1
@@ -26,9 +27,19 @@ def run_server():
     server = SimpleThreadedXMLRPCServer(server_addr)
     server.register_function(checkCorrectParameters)
     server.register_function(search)
+  
     print("Server started...")
     print('listening on {} port {}'.format(host, port))
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    
+    except KeyboardInterrupt:
+        server.shutdown()
+        server.server_close()
+        print('Closing the server')
+        sys.exit()
+
+
 
 
 #query class
@@ -104,6 +115,8 @@ def wikipediaSearch(start_topic):
 
     #no links found  
     except KeyError:
+        pass
+    except json.decoder.JSONDecodeError:
         pass
 
     #https://stackoverflow.com/questions/14882571/how-to-get-all-urls-in-a-wikipedia-page
@@ -189,85 +202,96 @@ def print_path(head):
 def algo (root_node, end,q, query):
     #https://onestepcode.com/graph-shortest-path-python/?utm_source=rss&utm_medium=rss&utm_campaign=graph-shortest-path-python
     #loop as long as no path found
-    while not query.END:
+    try:
+        while not query.END:
 
-        #path found
-        if (query.END):
-            break
-        # if queue has data
-        if (not q.empty()):
+            #path found
+            if (query.END):
+                break
+            # if queue has data
+            if (not q.empty()):
 
-            #get next search node from queue
-            root_node = q.get()
+                #get next search node from queue
+                root_node = q.get()
 
-            #get the search value
-            search_term = root_node.node_value
+                #get the search value
+                search_term = root_node.node_value
 
-            #get links for that page
-            links = wikipediaSearch(search_term)
+                #get links for that page
+                links = wikipediaSearch(search_term)
 
-            #add links to tree for tha  root node
-            for link in links:
-                root_node.add_link(link, root_node)
+                #add links to tree for tha  root node
+                for link in links:
+                    root_node.add_link(link, root_node)
+                    
+                    #add links to queue
+                    q.put(root_node.links[-1])
+
+                #search the links for the end value
+                value_found = seach_tree(root_node, end, query)
+
+                #end value found
+                if(value_found != root_node):
                 
-                #add links to queue
-                q.put(root_node.links[-1])
+                    #add path to list
+                    path = print_path(value_found)
 
-            #search the links for the end value
-            value_found = seach_tree(root_node, end, query)
-
-            #end value found
-            if(value_found != root_node):
-               
-                #add path to list
-                path = print_path(value_found)
-
-                #add query and set end to true so other threads know that path has been found
-                query.path = path
-                query.END = True
-                return 
+                    #add query and set end to true so other threads know that path has been found
+                    query.path = path
+                    query.END = True
+                    return 
+    except KeyboardInterrupt as e:
+        query.END = True
+        return e
 
 #seach/worker unit that takes the query from the client and handles it           
 def search (start, end):
-
-    #create a new query for this request
-    query = Query()
-    
-    #create new queue for this request
-    q = queue.Queue()
-    
-    #add start page to tree as root node and put it to queue
-    root_node = TreeNode(start)
-    q.put(root_node)
-
-    #list for threads
-    thread_list = []
-    #st = time.time()
-
-    #create 10 threads that run algo() function that try to find the path
-    #https://www.tutorialspoint.com/python/python_multithreading.htm
-    for i in range(10):
+   
+    try:
+        #create a new query for this request
+        query = Query()
         
-        work =  threading.Thread(target=algo, args=(root_node, end , q, query), daemon=True)
-        work.start()
-        thread_list.append(work)
-    
-    print('\nStarted 10 threads.')
+        #create new queue for this request
+        q = queue.Queue()
+        
+        #add start page to tree as root node and put it to queue
+        root_node = TreeNode(start)
+        q.put(root_node)
 
-    #join the threads together
-    for thread in thread_list:
-        thread.join()
+        #list for threads
+        thread_list = []
+        #st = time.time()
 
-    #run as long as path is found
-    while True:
+        #create 10 threads that run algo() function that try to find the path
+        #https://www.tutorialspoint.com/python/python_multithreading.htm
+        for i in range(10):
+            
+            work =  threading.Thread(target=algo, args=(root_node, end , q, query), daemon=True)
+            work.start()
+            thread_list.append(work)
+        
+        print('\nStarted 10 threads.')
 
-        #path found and return the path to client
-        if(query.END):
-           # et = time.time()
-            #took = et-st
-            #print(took)
-            print('Threads closed')
-            return query.path
+        #join the threads together
+        for thread in thread_list:
+            thread.join()
+
+        #run as long as path is found
+        while True:
+            try:
+                time.sleep(0.5) #https://itecnote.com/tecnote/python-threading-ignores-keyboardinterrupt-exception/
+                #path found and return the path to client
+                if(query.END):
+                # et = time.time()
+                    #took = et-st
+                    #print(took)
+                    print('Threads closed')
+                    return query.path
+            except KeyboardInterrupt as e:
+                query.END = True
+    except KeyboardInterrupt as e:
+        query.END = True
+        
             
 
 
@@ -309,5 +333,5 @@ def checkCorrectParameters(parameter):
 try:
     run_server()
 except KeyboardInterrupt:
-    print('Closing the server')
+    print('ERROR')
     sys.exit(0)

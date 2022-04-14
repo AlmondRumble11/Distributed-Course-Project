@@ -70,7 +70,7 @@ def main():
                 continue
             except KeyboardInterrupt:
                 print("\nClosing the program")
-                sys.exit(0)
+                sys.exit()
 
             #if both are the same-->
             if (start == end):
